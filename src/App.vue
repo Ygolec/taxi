@@ -238,7 +238,7 @@
                 <v-text-field
                     class=""
                     prepend-icon="mdi-account"
-                    v-model="email"
+                    v-model="emailuser"
                     label="Email"
                     type="email"
                     :rules="[required]">
@@ -290,7 +290,26 @@
 
     </v-bottom-navigation>
   </v-app>
+  <v-dialog
+      v-model="dialogEnd"
+      width="auto"
+  >
+    <v-card>
+      <v-card-text>
+        <h2>Спасибо за поездку!</h2><br>
+        Оцените поездку:<br>
+        <v-rating
+            color="indigo"
+        v-model="rating">
 
+        </v-rating>
+      </v-card-text>
+      <v-card-actions>
+        <v-btn color="indigo" block @click="dialogEnd = false;">Закрыть сообщение</v-btn>
+      </v-card-actions>
+    </v-card>
+
+</v-dialog>
 
 </template>
 
@@ -306,7 +325,7 @@ import "leaflet-routing-machine";
 import 'leaflet-search';
 import {password, required} from "@/utils/rules";
 import RegistrationForm from "@/components/registrationForm.vue";
-import {useUserStore} from "@/store/user";
+// import {useUserStore} from "@/store/user";
 
 //Меню
 const listOfMenuPass = ref([{title: 'Например'}])
@@ -328,6 +347,8 @@ const toLongitude = ref();
 const snackbar = ref(false)
 const snackbarText = ref('')
 const timeout = ref(200)
+
+
 
 //Размеры экрана
 const screen_height = ref(window.screen.height);
@@ -381,19 +402,34 @@ watch([longitude, latitude], () => {
 
 
 watch([toOrder, fromOrder], () => {
-  if (fromOrder.value) {
+  // if (fromOrder.value) {
+  //   fromLatitude.value = fromOrder.value.latitude
+  //   fromLongitude.value = fromOrder.value.longitude
+  //   dataOfRoute.value = L.Routing.control({
+  //     show: false,
+  //     waypoints: [
+  //       L.latLng(fromLatitude.value, fromLongitude.value),
+  //       L.latLng(toLatitude.value, toLongitude.value)
+  //     ],
+  //
+  //   }).addTo(map.value)
+  // }
+  // if (toOrder.value) {
+  //   toLatitude.value = toOrder.value.latitude
+  //   toLongitude.value = toOrder.value.longitude
+  //   dataOfRoute.value = L.Routing.control({
+  //     show: false,
+  //     waypoints: [
+  //       L.latLng(fromLatitude.value, fromLongitude.value),
+  //       L.latLng(toLatitude.value, toLongitude.value)
+  //     ],
+  //
+  //   }).addTo(map.value)
+  // }
+
+  if (toOrder.value != null && fromOrder.value != null) {
     fromLatitude.value = fromOrder.value.latitude
     fromLongitude.value = fromOrder.value.longitude
-    dataOfRoute.value = L.Routing.control({
-      show: false,
-      waypoints: [
-        L.latLng(fromLatitude.value, fromLongitude.value),
-        L.latLng(toLatitude.value, toLongitude.value)
-      ],
-
-    }).addTo(map.value)
-  }
-  if (toOrder.value) {
     toLatitude.value = toOrder.value.latitude
     toLongitude.value = toOrder.value.longitude
     dataOfRoute.value = L.Routing.control({
@@ -404,9 +440,6 @@ watch([toOrder, fromOrder], () => {
       ],
 
     }).addTo(map.value)
-  }
-
-  if (toOrder.value != null && fromOrder.value != null) {
     setTimeout(()=>{
       dialogSettingOrder.value= true
       dialogSettingOrder.value= false
@@ -415,10 +448,11 @@ watch([toOrder, fromOrder], () => {
       price.value["2"]=Math.ceil(totalDistance.value*(40*1.3));
       price.value["3"]=Math.ceil(totalDistance.value*(40*1.5));
       price.value["4"]=Math.ceil(totalDistance.value*(40*1.4));
-    },1000)
+      disableOrder.value = false
+    },2000)
 
 
-    disableOrder.value = false
+
   } else disableOrder.value = true
 })
 
@@ -444,12 +478,15 @@ const dialogSettingOrder = ref()
 const paymentType = ref('cash')
 //Авторизация
 const dialogAuth = ref()
-const email = ref('')
+const emailuser = ref('')
 const userPassword = ref('')
 //Отображение поездки
 const visionDrive = ref(false)
 const rideProcess = ref(0)
 const timeLeft = ref()
+//Окончание поездки
+const dialogEnd=ref(false)
+const rating=ref(5)
 
 const options = {
   enableHighAccuracy: true,
@@ -472,7 +509,9 @@ function error(err) {
 navigator.geolocation.getCurrentPosition(success, error, options);
 
 function login() {
-  useUserStore().login(email.value, userPassword.value).then(successfulLogin)
+  // useUserStore().login(emailuser.value, userPassword.value).then(successfulLogin)
+
+  successfulLogin()
 }
 
 function successfulLogin() {
@@ -490,11 +529,21 @@ function takeOrder() {
     timeLeft.value = timeLeft.value - 1;
   }, 1000);
 
+
   watch(rideProcess, () => {
     if (rideProcess.value === Math.round(timeOfRoute.value % 3600 / 60)) {
       clearInterval(timerId);
       orderForm.value = true;
       visionDrive.value = false;
+      dialogEnd.value=true;
+      fromOrder.value=null;
+      toOrder.value=null;
+      fromLatitude.value = null;
+      fromLongitude.value = null;
+      toLatitude.value = null;
+      toLongitude.value = null;
+
+
     }
   })
 }
