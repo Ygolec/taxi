@@ -1,6 +1,22 @@
 <template>
 
   <v-app>
+    <v-snackbar
+        v-model="snackbar"
+        :timeout="timeout"
+    >
+      {{ snackbarText }}
+
+      <template v-slot:actions>
+        <v-btn
+            color="blue"
+            variant="text"
+            @click="snackbar = false"
+        >
+          Close
+        </v-btn>
+      </template>
+    </v-snackbar>
     <v-app-bar style=" margin:10px;width: 99%" rounded>
       <v-row>
         <v-col
@@ -131,7 +147,7 @@
                   {{ namesOfClassCar[n - 1] }}
                 </v-card-subtitle>
                 <v-card-text>
-                  100
+                  {{ price[n] }}
                 </v-card-text>
 
                 <div class="d-flex fill-height align-center justify-center">
@@ -290,6 +306,7 @@ import "leaflet-routing-machine";
 import 'leaflet-search';
 import {password, required} from "@/utils/rules";
 import RegistrationForm from "@/components/registrationForm.vue";
+import {useUserStore} from "@/store/user";
 
 //Меню
 const listOfMenuPass = ref([{title: 'Например'}])
@@ -303,48 +320,111 @@ const crd = ref();
 const latitude = ref(47.41322);
 const longitude = ref(-1.219482);
 //Координаты пути
-const fromLatitude = ref(55.6401);
-const fromLongitude = ref(37.6097);
-const toLatitude = ref(55.7506);
-const toLongitude = ref(37.6176);
-
+const fromLatitude = ref();
+const fromLongitude = ref();
+const toLatitude = ref();
+const toLongitude = ref();
+//Алерт
+const snackbar = ref(false)
+const snackbarText = ref('')
+const timeout = ref(200)
 
 //Размеры экрана
 const screen_height = ref(window.screen.height);
 const screen_width = ref(window.screen.width);
 //Заказ такси
+
+const price = ref({
+  1: '~',
+  2: '~',
+  3: '~',
+  4: '~'
+})
+const totalDistance = ref(0)
 const orderForm = ref(true)
 const disableOrder = ref(true)
 const toOrder = ref()
 const fromOrder = ref()
-const toOrderItems = ref(['Moskow'])
-const fromOrderItems = ref(['Moskow'])
+const toOrderItems = ref(
+    [
+      {
+        title: 'Олимпийский комплекс «Лужники», улица Хамовнический Вал, Лужники, район Хамовники, Москва, Центральный федеральный округ, 119270, Россия',
+        value: {
+          latitude: 55.71628,
+          longitude: 37.55450
+        }
+      }
+    ]
+)
+const fromOrderItems = ref(
+    [
+      {
+        title: 'АУК «Мясницкий» НИУ ВШЭ, 11, Мясницкая улица, Красносельский район, Москва, Центральный федеральный округ, 101000, Россия',
+        value: {
+          latitude: 55.76150,
+          longitude: 37.63243
+        }
+      }
+    ])
 const dataOfRoute = ref()
 //Переменные под заказ такси
 const timeOfRoute = ref(0)
 watch([longitude, latitude], () => {
-  map.value = L.map(mapContainer.value).setView([latitude.value, longitude.value], 13);
+  map.value = L.map(mapContainer.value).setView([latitude.value, longitude.value], 12);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
 
   }).addTo(map.value);
 
-  dataOfRoute.value = L.Routing.control({
-    show: false,
-    waypoints: [
-      L.latLng(fromLatitude.value, fromLongitude.value),
-      L.latLng(toLatitude.value, toLongitude.value)
-    ],
 
-  }).addTo(map.value)
 });
 
 
 watch([toOrder, fromOrder], () => {
+  if (fromOrder.value) {
+    fromLatitude.value = fromOrder.value.latitude
+    fromLongitude.value = fromOrder.value.longitude
+    dataOfRoute.value = L.Routing.control({
+      show: false,
+      waypoints: [
+        L.latLng(fromLatitude.value, fromLongitude.value),
+        L.latLng(toLatitude.value, toLongitude.value)
+      ],
+
+    }).addTo(map.value)
+  }
+  if (toOrder.value) {
+    toLatitude.value = toOrder.value.latitude
+    toLongitude.value = toOrder.value.longitude
+    dataOfRoute.value = L.Routing.control({
+      show: false,
+      waypoints: [
+        L.latLng(fromLatitude.value, fromLongitude.value),
+        L.latLng(toLatitude.value, toLongitude.value)
+      ],
+
+    }).addTo(map.value)
+  }
+
   if (toOrder.value != null && fromOrder.value != null) {
+    setTimeout(()=>{
+      dialogSettingOrder.value= true
+      dialogSettingOrder.value= false
+      totalDistance.value = dataOfRoute.value._routes[0].summary.totalDistance / 1000
+      price.value["1"]=Math.ceil(totalDistance.value*40);
+      price.value["2"]=Math.ceil(totalDistance.value*(40*1.3));
+      price.value["3"]=Math.ceil(totalDistance.value*(40*1.5));
+      price.value["4"]=Math.ceil(totalDistance.value*(40*1.4));
+    },1000)
+
+
     disableOrder.value = false
   } else disableOrder.value = true
 })
+
+
+
+
 
 
 const selectedCarClass = ref(0);
@@ -367,9 +447,9 @@ const dialogAuth = ref()
 const email = ref('')
 const userPassword = ref('')
 //Отображение поездки
-const visionDrive = ref(true)
+const visionDrive = ref(false)
 const rideProcess = ref(0)
-const timeLeft=ref()
+const timeLeft = ref()
 
 const options = {
   enableHighAccuracy: true,
@@ -392,22 +472,29 @@ function error(err) {
 navigator.geolocation.getCurrentPosition(success, error, options);
 
 function login() {
-  console.log('awd')
+  useUserStore().login(email.value, userPassword.value).then(successfulLogin)
+}
+
+function successfulLogin() {
+  snackbarText.value = 'Вы авторизировались!';
+  snackbar.value = true;
 }
 
 function takeOrder() {
   orderForm.value = false;
   visionDrive.value = true;
   timeOfRoute.value = dataOfRoute.value._routes[0].summary.totalTime
-  timeLeft.value=Math.round(timeOfRoute.value % 3600 / 60)
+  timeLeft.value = Math.round(timeOfRoute.value % 3600 / 60)
   let timerId = setInterval(() => {
     rideProcess.value = rideProcess.value + 1;
-    timeLeft.value=timeLeft.value-1;
-    }, 1000);
+    timeLeft.value = timeLeft.value - 1;
+  }, 1000);
 
   watch(rideProcess, () => {
     if (rideProcess.value === Math.round(timeOfRoute.value % 3600 / 60)) {
       clearInterval(timerId);
+      orderForm.value = true;
+      visionDrive.value = false;
     }
   })
 }
@@ -419,16 +506,5 @@ function takeOrder() {
 @import "../node_modules/leaflet-routing-machine/dist/leaflet-routing-machine.css";
 @import "../node_modules/leaflet/dist/leaflet.css";
 
-.leaflet-top leaflet-right {
-  visibility: hidden;
-  display: none;
-}
 
-.selectedCarClass {
-  background: gray;
-}
-
-.map {
-  z-index: 1;
-}
 </style>
